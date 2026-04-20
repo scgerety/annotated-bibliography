@@ -24,7 +24,7 @@ def main():
 def query(query=query, api_key=CORE_api):
     url = "https://api.core.ac.uk/v3/search/works"
     headers = {"Authorization": f"Bearer {api_key}"}
-    params = {"q": {"title": f"{query}"}, "scroll": True, "limit": 100}
+    params = {"q": f"{query}", "scroll": True, "limit": 100}
 
     try:
         response = requests.get(url, headers=headers, params=params)
