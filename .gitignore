@@ -211,3 +211,5 @@ __marimo__/
 *.json
 scratch.py
 *.model
+*.csv#
+.~lock.*
