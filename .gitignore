@@ -209,3 +209,5 @@ __marimo__/
 # Files and tests
 *.csv
 *.json
+scratch.py
+*.model
