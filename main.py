@@ -19,18 +19,28 @@ result_csv = os.path.join(this_dir, "result.csv")
 
 def main():
     query()
-    show_all()
+    df = load_result()
+    # df = analyze_full_text(df)
+    save_result(df)
+
 
 def query(query=query, api_key=CORE_api):
     url = "https://api.core.ac.uk/v3/search/works"
     headers = {"Authorization": f"Bearer {api_key}"}
-    params = {"q": f"{query}", "scroll": True, "limit": 100}
+    params = {
+        "q": f"{query}", # Just use a basic query for CORE. Searching title or abstract
+                         # seems to get useless results.
+        "scroll": True,
+        "limit": 100,
+    }
 
     try:
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
+            results = response.json()
+            results = results["results"]
             with open(result_json, "w") as r:
-                json.dump(response.json(), r)
+                r.write(json.dumps(results, indent=4))
         else:
             print(f"Error: {response.status_code}: {response.text}")
             return None
@@ -39,9 +49,16 @@ def query(query=query, api_key=CORE_api):
         return None
 
 
-def show_all():
-
+def load_result():
     df = pd.read_json(result_json)
+    return df
+
+
+def analyze_full_text(df):
+   pass 
+
+def save_result(df):
+    df.to_csv(result_csv)
 
 
 if __name__ == "__main__":
