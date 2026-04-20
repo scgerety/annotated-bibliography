@@ -20,7 +20,7 @@ result_csv = os.path.join(this_dir, "result.csv")
 def main():
     query()
     df = load_result()
-    # df = analyze_full_text(df)
+    df = analyze_full_text(df)
     save_result(df)
 
 
@@ -51,11 +51,25 @@ def query(query=query, api_key=CORE_api):
 
 def load_result():
     df = pd.read_json(result_json)
+    df = df[[
+        "id",
+        "title",
+        "authors",
+        "abstract",
+        "fullText",
+    ]]
     return df
 
 
 def analyze_full_text(df):
-   pass 
+   df = df[[
+        "id",
+        "title",
+        "authors",
+        "abstract",
+    ]] 
+   df["topics"] = 0
+   return df
 
 def save_result(df):
     df.to_csv(result_csv)
