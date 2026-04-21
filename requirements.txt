@@ -47,6 +47,7 @@ nvidia-nvjitlink==13.0.88
 nvidia-nvshmem-cu13==3.4.5
 nvidia-nvtx==13.0.85
 packaging==26.1
+pandas==3.0.2
 pillow==12.2.0
 Pygments==2.20.0
 pynndescent==0.6.0

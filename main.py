@@ -22,8 +22,8 @@ def main():
     # query() # Needed once every new query.
     data = load_result()
     # train_model(data) # Needed only during setup stage. Not for every query.
-    doc_tokens = analyze_full_text()
-    save_result(data, doc_tokens)
+    topic_list = analyze_full_text()
+    save_result(data, topic_list)
 
 
 def query(query=query, api_key=CORE_api):
@@ -80,19 +80,19 @@ def train_model(data):
 
 def analyze_full_text():
     model = Top2Vec.load("bib.model")
-    doc_tokens = [doc for doc in model.get_document_tokens()]
+    topic_list = [topics for topics, scores, nums in model.get_topics()]
     return doc_tokens
 
 
-def save_result(data, doc_tokens):
+def save_result(data, topic_list):
     with open(result_csv, "a") as token_list:
         token_list.write("id|authors|title|publishedDate|abstract|tokens\n") # Delimiter is | (pipe). If using pandas,
                                                                              # use sep="|" param.
-        for row, tokens in zip(data, doc_tokens):
+        for row, topics in zip(data, topic_list):
             if type(row["abstract"]) is str:
                 row["abstract"] = row["abstract"].replace("\n", " ") # Not losing any data here.
             token_list.write(f'{row["id"]}|{row["authors"]}|{row["title"]}|{row["publishedDate"]}|"{row["abstract"]}"|')
-            token_list.write("-".join(tokens))
+            token_list.write(f'[{",".join(topics)}]')
             token_list.write("\n")
 
 
