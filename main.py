@@ -20,19 +20,19 @@ result_json = os.path.join(this_dir, "result.json")
 result_csv = os.path.join(this_dir, "result.csv")
 
 def main():
-    # query()
-    df = load_result()
-    # train_model(df)
-    df = analyze_full_text(df)
-    save_result(df)
+    # query() # Needed once every new query.
+    data = load_result()
+    # train_model(data) # Needed only during setup stage. Not for every query.
+    doc_tokens = analyze_full_text()
+    save_result(data, doc_tokens)
 
 
 def query(query=query, api_key=CORE_api):
     url = "https://api.core.ac.uk/v3/search/works"
     headers = {"Authorization": f"Bearer {api_key}"}
     params = {
-        "q": f"{query}", # Just use a basic query for CORE. Searching title or abstract
-                         # seems to get useless results.
+        "q": f"{query}", # Just use a basic query for CORE. Searching title or
+                         # abstract seems to get useless results.
         "scroll": True,
         "limit": 100,
     }
@@ -41,7 +41,8 @@ def query(query=query, api_key=CORE_api):
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             results = response.json()
-            results = results["results"]
+            results = results["results"] # Only focus on results for purpose of
+                                         # training. Everything else is noise.
             with open(result_json, "w") as r:
                 r.write(json.dumps(results, indent=4))
         else:
@@ -53,50 +54,47 @@ def query(query=query, api_key=CORE_api):
 
 
 def load_result():
-    df = pd.read_json(result_json)
-    df = df[[
-        "id",
-        "title",
-        "authors",
-        "abstract",
-        "fullText",
-    ]]
-    return df
+    with open(result_json) as j:
+        data = json.load(j)
+    data = [{
+        "id": doc["id"],
+        "authors": doc["authors"],
+        "title": doc["title"],
+        "publishedDate": doc["publishedDate"] if "publishedDate" in doc.keys() else None,
+        "abstract": doc["abstract"],
+        "fullText": doc["fullText"],
+        } for doc in data]
+    return data
 
 
-def train_model(df):
-    docs = df.fullText.tolist()
+def train_model(data):
+    docs = [doc["fullText"] for doc in data]
     model = Top2Vec(docs,
                     speed="deep-learn",
                     workers=8,
                     ngram_vocab=True,
-                    contextual_top2vec=True, # Hoping this will work.
+                    contextual_top2vec=True,
                     )
 
     model.save("bib.model")
 
 
-def analyze_full_text(df):
+def analyze_full_text():
     model = Top2Vec.load("bib.model")
     doc_tokens = [doc for doc in model.get_document_tokens()]
+    return doc_tokens
 
-    with open("tokens.csv", "a") as token_list:
-        for tokens in doc_tokens:
-            token_list.write(",".join(tokens))
+
+def save_result(data, doc_tokens):
+    with open(result_csv, "a") as token_list:
+        token_list.write("id|authors|title|publishedDate|abstract|tokens\n") # Delimiter is | (pipe). If using pandas,
+                                                                             # use sep="|" param.
+        for row, tokens in zip(data, doc_tokens):
+            if type(row["abstract"]) is str:
+                row["abstract"] = row["abstract"].replace("\n", " ") # Not losing any data here.
+            token_list.write(f'{row["id"]}|{row["authors"]}|{row["title"]}|{row["publishedDate"]}|"{row["abstract"]}"|')
+            token_list.write("-".join(tokens))
             token_list.write("\n")
-
-    df = df[[
-        "id",
-        "title",
-        "authors",
-        "abstract",
-    ]] 
-    df["topics"] = ""
-    return df
-
-
-def save_result(df):
-    df.to_csv(result_csv)
 
 
 if __name__ == "__main__":
