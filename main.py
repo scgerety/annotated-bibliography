@@ -9,7 +9,6 @@ import json
 import os
 import sys
 import requests
-import pandas as pd
 from top2vec import Top2Vec
 
 CORE_api = os.getenv('CORE')
