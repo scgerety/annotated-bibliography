@@ -7,8 +7,8 @@ author=scgerety
 
 import json
 import os
-import sys
 import requests
+import sys
 from top2vec import Top2Vec
 
 CORE_api = os.getenv('CORE')
@@ -17,13 +17,15 @@ query = " ".join(sys.argv[1:])
 this_dir = os.path.dirname(os.path.abspath(__file__))
 result_json = os.path.join(this_dir, "result.json")
 result_csv = os.path.join(this_dir, "result.csv")
+model_file = os.path.join(this_dir, "bib.model")
 
 def main():
     # query() # Needed once every new query.
     data = load_result()
     # train_model(data) # Needed only during setup stage. Not for every query.
-    topic_list = analyze_full_text()
-    save_result(data, topic_list)
+    theme_list = analyze_full_text()
+    document_summaries = assign_topic_relevance()
+    save_result(data, document_summaries, theme_list)
 
 
 def query(query=query, api_key=CORE_api):
@@ -74,26 +76,45 @@ def train_model(data):
                     ngram_vocab=True,
                     contextual_top2vec=True,
                     )
-
-    model.save("bib.model")
+    model.save(model_file)
 
 
 def analyze_full_text():
-    model = Top2Vec.load("bib.model")
-    topic_list = [topics for topics, scores, nums in model.get_topics()]
-    return doc_tokens
+    model = Top2Vec.load(model_file)
+    
+    topic_summaries = model.get_topics()
+    themes = [model.similar_words(topic, 5) for topic in topic_summaries[0]]
+    theme_list = []
+    for theme, topic, score, idx in zip(themes, topic_summaries[0], topic_summaries[1], topic_summaries[2]):
+        theme_list.append(",".join(word for word in theme[0]))
+        theme = "_".join(word for word in theme[0]).replace(" ", "-")
+        with open(f"{idx:02d}.{theme}.csv", "w") as d:
+            d.write(f"{idx}\n{theme}\n")
+            d.write("word|score\n")
+            for word, word_score in zip(topic, score):
+                d.write(f"{word}|{word_score}\n")
+    return theme_list
 
 
-def save_result(data, topic_list):
+def assign_topic_relevance():
+    model = Top2Vec.load(model_file)
+    document_summaries = model.get_document_topic_relevance()
+    return document_summaries
+
+
+def save_result(data, document_summaries, theme_list):
     with open(result_csv, "a") as token_list:
-        token_list.write("id|authors|title|publishedDate|abstract|tokens\n") # Delimiter is | (pipe). If using pandas,
-                                                                             # use sep="|" param.
-        for row, topics in zip(data, topic_list):
+        topic_cols = []
+        token_list.write(
+                f'id|authors|title|publishedDate|abstract|{"|".join(theme_list)}\n'
+                ) # Delimiter is | (pipe). If using pandas, use sep="|" param.
+        for row, topics in zip(data, document_summaries):
             if type(row["abstract"]) is str:
                 row["abstract"] = row["abstract"].replace("\n", " ") # Not losing any data here.
-            token_list.write(f'{row["id"]}|{row["authors"]}|{row["title"]}|{row["publishedDate"]}|"{row["abstract"]}"|')
-            token_list.write(f'[{",".join(topics)}]')
-            token_list.write("\n")
+            topics = [str(relevance_score) for relevance_score in topics]
+            token_list.write(
+                f'{row["id"]}|{row["authors"]}|{row["title"]}|{row["publishedDate"]}|"{row["abstract"]}"|{"|".join(topics)}\n'
+                )
 
 
 if __name__ == "__main__":
