@@ -11,6 +11,7 @@ import requests
 import sys
 from top2vec import Top2Vec
 
+
 CORE_api = os.getenv('CORE')
 HF_TOKEN = os.getenv('HF_TOKEN')
 query = " ".join(sys.argv[1:])
@@ -19,10 +20,11 @@ result_json = os.path.join(this_dir, "result.json")
 result_csv = os.path.join(this_dir, "result.csv")
 model_file = os.path.join(this_dir, "bib.model")
 
+
 def main():
-    # query() # Needed once every new query.
+    query() # Needed once every new query.
     data = load_result()
-    # train_model(data) # Needed only during setup stage. Not for every query.
+    train_model(data) # Needed only during setup stage. Not for every query.
     theme_list = analyze_full_text()
     document_summaries = assign_topic_relevance()
     save_result(data, document_summaries, theme_list)
@@ -42,8 +44,11 @@ def query(query=query, api_key=CORE_api):
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             results = response.json()
-            results = results["results"] # Only focus on results for purpose of
-                                         # training. Everything else is noise.
+            results = [doc for doc in results["results"] if "language" in doc.keys() and doc["language"]["code"] == "en"]
+            # Only focus on results for purpose of
+            # training. Everything else is noise.
+            # Also, filter only for english, since 
+            # not using multilingual language model.
             with open(result_json, "w") as r:
                 r.write(json.dumps(results, indent=4))
         else:
@@ -64,7 +69,7 @@ def load_result():
         "publishedDate": doc["publishedDate"] if "publishedDate" in doc.keys() else None,
         "abstract": doc["abstract"],
         "fullText": doc["fullText"],
-        } for doc in data]
+        } for doc in data if doc["language"]["code"] == "en"]
     return data
 
 
@@ -104,13 +109,13 @@ def assign_topic_relevance():
 
 def save_result(data, document_summaries, theme_list):
     with open(result_csv, "a") as token_list:
-        topic_cols = []
         token_list.write(
                 f'id|authors|title|publishedDate|abstract|{"|".join(theme_list)}\n'
                 ) # Delimiter is | (pipe). If using pandas, use sep="|" param.
         for row, topics in zip(data, document_summaries):
             if type(row["abstract"]) is str:
                 row["abstract"] = row["abstract"].replace("\n", " ") # Not losing any data here.
+            row["authors"] = [author["name"] for author in row["authors"]] # The author column is a list of dictionaries with one key: "name"
             topics = [str(relevance_score) for relevance_score in topics]
             token_list.write(
                 f'{row["id"]}|{row["authors"]}|{row["title"]}|{row["publishedDate"]}|"{row["abstract"]}"|{"|".join(topics)}\n'
